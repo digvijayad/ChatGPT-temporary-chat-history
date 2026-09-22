@@ -1,0 +1,18 @@
+{
+    "name": "chatgpt-temporary-chat-history",
+    "version": "2.3.1",
+    "private": true,
+    "description": "Tampermonkey userscript that keeps a local recovery history for ChatGPT Temporary Chats.",
+    "license": "MIT",
+    "scripts": {
+        "syntax": "node --check chatgpt-temporary-chat-history.user.js",
+        "lint": "eslint chatgpt-temporary-chat-history.user.js eslint.config.js",
+        "format": "prettier --write chatgpt-temporary-chat-history.user.js eslint.config.js README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md package.json .prettierrc.json",
+        "format:check": "prettier --check chatgpt-temporary-chat-history.user.js eslint.config.js README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md package.json .prettierrc.json",
+        "check": "npm run syntax && npm run lint && npm run format:check"
+    },
+    "devDependencies": {
+        "eslint": "^9.35.0",
+        "prettier": "^3.6.2"
+    }
+}
