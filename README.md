@@ -1,8 +1,18 @@
+<a id="top"></a>
+<a href="./LICENSE">
+<img alt="[License: MIT]" src="https://img.shields.io/badge/License-MIT-orange.svg?logo=internetarchive&logoColor=white&labelColor=464646&style=for-the-badge"></a>
+<a href="https://chatgptjs.org">
+<img alt="[Powered by chatgpt.js]" src="https://img.shields.io/badge/Powered_by-chatgpt.js-black?logo=gamejolt&logoColor=white&labelColor=464646&style=for-the-badge"></a>
+
 ## Install
 
 ### One-click install
 
-[Install with Tampermonkey](https://raw.githubusercontent.com/digvijayad/ChatGPT-temporary-chat-history/main/chatgpt-temporary-chat-history.user.js)
+<a href="https://raw.githubusercontent.com/digvijayad/ChatGPT-temporary-chat-history/main/chatgpt-temporary-chat-history.user.js"><img style="height: 45px" alt="[Install this script]" src="./assets/images/buttons/install-this-script.svg"></a><a href="#installation"><img style="height: 45px" alt="[How to install]" title="How to install" src="./assets/images/buttons/help.svg"></a>
+<br>
+[Discuss](https://github.com/digvijayad/ChatGPT-temporary-chat-history/discussions) /
+[Get support](https://github.com/digvijayad/ChatGPT-temporary-chat-history/issues) /
+[Contact author](https://github.com/digvijayad)
 
 > Requires the Tampermonkey browser extension.
 
@@ -28,7 +38,7 @@ Temporary Chats are intentionally absent from ChatGPT's normal sidebar history. 
 - Import previously exported JSON history.
 - Stores history with Tampermonkey storage; no external server is used by this script.
 
-## Install
+## Installation
 
 ### Tampermonkey
 
@@ -114,6 +124,11 @@ node --check chatgpt-temporary-chat-history.user.js
 
 ```text
 .
+├── assets/
+│   └── images/
+│       └── buttons/
+│           ├── help.svg
+│           └── install-this-script.svg
 ├── chatgpt-temporary-chat-history.user.js
 ├── chatgpt-temporary-chat-history.meta.js
 ├── README.md
