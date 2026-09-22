@@ -1,3 +1,11 @@
+## Install
+
+### One-click install
+
+[Install with Tampermonkey](https://raw.githubusercontent.com/digvijayad/ChatGPT-temporary-chat-history/main/chatgpt-temporary-chat-history.user.js)
+
+> Requires the Tampermonkey browser extension.
+
 # ChatGPT Temporary Chat History
 
 A Tampermonkey userscript that keeps a **local recovery history for ChatGPT Temporary Chats**.
@@ -33,16 +41,17 @@ Temporary Chats are intentionally absent from ChatGPT's normal sidebar history. 
 
 ### From GitHub
 
-After publishing this repository, users can open the raw `.user.js` file in a browser with Tampermonkey installed. Tampermonkey should offer to install it.
+If you already have Tampermonkey installed, open the raw userscript:
+https://raw.githubusercontent.com/digvijayad/ChatGPT-temporary-chat-history/main/chatgpt-temporary-chat-history.user.js
 
-For automatic updates, add `@downloadURL` and `@updateURL` metadata after you know the final GitHub repository URL.
+Tampermonkey should automatically detect the `.user.js` file and display its installation screen.
 
-Example:
+The script includes:
 
-```text
-// @downloadURL  https://raw.githubusercontent.com/digvijayad/chatgpt-temporary-chat-history/main/chatgpt-temporary-chat-history.user.js
-// @updateURL    https://raw.githubusercontent.com/digvijayad/chatgpt-temporary-chat-history/main/chatgpt-temporary-chat-history.user.js
-```
+- `@downloadURL` for downloading the latest release from GitHub.
+- `@updateURL` so Tampermonkey can periodically check GitHub for newer versions.
+
+When publishing an update, increment the `@version` value in the userscript. Tampermonkey compares that version against the installed version and offers/installs the newer copy according to the user's Tampermonkey update settings.
 
 ## Greasy Fork / OpenUserJS
 
@@ -106,6 +115,7 @@ node --check chatgpt-temporary-chat-history.user.js
 ```text
 .
 ├── chatgpt-temporary-chat-history.user.js
+├── chatgpt-temporary-chat-history.meta.js
 ├── README.md
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
