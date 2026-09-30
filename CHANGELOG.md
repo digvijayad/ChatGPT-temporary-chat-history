@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic versioning where practical.
 
+## [2.3.2] - 2026-09-30
+
+### Fixed
+
+- Anchored the history button to ChatGPT's page/app-shell header obstacle instead of switching between individual header controls as the interface updates.
+- Detects new Temporary Chats from the exact `POST /backend-api/f/conversation/prepare` request when its payload contains both `history_and_training_disabled: true` and a valid `conversation_id`.
+- Ignores normal prepare requests, where `history_and_training_disabled` is absent, as well as unrelated request and response payloads.
+- Removed the ambiguous UI-text and generic payload heuristics that could classify regular chats as Temporary Chats.
+
 ## [2.3.1] - 2026-09-22
 
 ### Changed

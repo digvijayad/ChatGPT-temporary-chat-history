@@ -1,6 +1,6 @@
 export default [
     {
-        files: ['**/*.js'],
+        files: ['chatgpt-temporary-chat-history.user.js'],
         ignores: ['node_modules/**', 'dist/**', 'coverage/**'],
         languageOptions: {
             ecmaVersion: 'latest',
@@ -11,6 +11,7 @@ export default [
                 URL: 'readonly',
                 XMLHttpRequest: 'readonly',
                 alert: 'readonly',
+                clearInterval: 'readonly',
                 confirm: 'readonly',
                 console: 'readonly',
                 document: 'readonly',

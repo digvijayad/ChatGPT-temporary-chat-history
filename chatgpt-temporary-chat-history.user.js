@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Temporary Chat History
 // @namespace    https://github.com/digvijayad/ChatGPT-temporary-chat-history
-// @version      2.3.1
+// @version      2.3.2
 // @description  Saves ChatGPT Temporary Chat IDs/URLs locally so closed temporary chats can be recovered.
 // @author       Digvijay
 // @license      MIT
@@ -21,10 +21,7 @@
 (function () {
     'use strict';
 
-    const win =
-        typeof unsafeWindow !== 'undefined'
-            ? unsafeWindow
-            : window;
+    const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
     // ============================================================
     // CONFIG
@@ -50,11 +47,12 @@
     let currentIsTemporary = false;
     let firstPrompt = null;
 
+    const temporaryConversationIds = new Set();
+
     let panel = null;
     let historyModal = null;
 
-    let lastKnownLocation =
-        location.pathname + location.search;
+    let lastKnownLocation = location.pathname + location.search;
 
     const UUID_PATTERN =
         '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
@@ -65,21 +63,11 @@
 
     function getHistory() {
         try {
-            const history =
-                GM_getValue(
-                    STORAGE_KEY,
-                    []
-                );
+            const history = GM_getValue(STORAGE_KEY, []);
 
-            return Array.isArray(history)
-                ? history
-                : [];
-
+            return Array.isArray(history) ? history : [];
         } catch (error) {
-            console.error(
-                '[Temp History] Read error:',
-                error
-            );
+            console.error('[Temp History] Read error:', error);
 
             return [];
         }
@@ -87,22 +75,11 @@
 
     function saveHistory(history) {
         try {
-            const limited =
-                history.slice(
-                    0,
-                    MAX_HISTORY
-                );
+            const limited = history.slice(0, MAX_HISTORY);
 
-            GM_setValue(
-                STORAGE_KEY,
-                limited
-            );
-
+            GM_setValue(STORAGE_KEY, limited);
         } catch (error) {
-            console.error(
-                '[Temp History] Save error:',
-                error
-            );
+            console.error('[Temp History] Save error:', error);
         }
     }
 
@@ -111,9 +88,7 @@
     // ============================================================
 
     function resetConversationState() {
-        console.log(
-            '[Temp History] Resetting conversation state'
-        );
+        console.log('[Temp History] Resetting conversation state');
 
         currentConversationId = null;
         firstPrompt = null;
@@ -128,68 +103,22 @@
 
     function detectTemporaryFromLocation() {
         try {
-            const url =
-                new URL(location.href);
+            const url = new URL(location.href);
 
             const values = [
-                url.searchParams.get(
-                    'temporary-chat'
-                ),
-                url.searchParams.get(
-                    'temporary_chat'
-                ),
-                url.searchParams.get(
-                    'temporaryChat'
-                )
+                url.searchParams.get('temporary-chat'),
+                url.searchParams.get('temporary_chat'),
+                url.searchParams.get('temporaryChat'),
             ];
 
-            if (
-                values.some(
-                    value =>
-                        value === 'true' ||
-                        value === '1'
-                )
-            ) {
+            if (values.some(value => value === 'true' || value === '1')) {
                 currentIsTemporary = true;
 
                 return true;
             }
-
         } catch (_) {}
 
         return currentIsTemporary;
-    }
-
-    function detectTemporaryUI() {
-        if (currentIsTemporary) {
-            return true;
-        }
-
-        try {
-            const elements =
-                document.querySelectorAll(
-                    'button, [role="button"], span'
-                );
-
-            for (const element of elements) {
-                const text =
-                    element.textContent
-                        ?.trim()
-                        .toLowerCase();
-
-                if (
-                    text === 'temporary chat' ||
-                    text === 'temporary'
-                ) {
-                    currentIsTemporary = true;
-
-                    return true;
-                }
-            }
-
-        } catch (_) {}
-
-        return false;
     }
 
     // ============================================================
@@ -198,191 +127,87 @@
 
     function inspectCurrentUrl() {
         try {
-            const currentLocation =
-                location.pathname +
-                location.search;
+            const currentLocation = location.pathname + location.search;
 
-            if (
-                currentLocation !==
-                lastKnownLocation
-            ) {
-                console.log(
-                    '[Temp History] Navigation:',
-                    lastKnownLocation,
-                    '→',
-                    currentLocation
-                );
+            if (currentLocation !== lastKnownLocation) {
+                console.log('[Temp History] Navigation:', lastKnownLocation, '→', currentLocation);
 
-                lastKnownLocation =
-                    currentLocation;
+                lastKnownLocation = currentLocation;
 
                 resetConversationState();
             }
 
             detectTemporaryFromLocation();
 
-            const url =
-                new URL(location.href);
+            const url = new URL(location.href);
 
             // Normal /c/<UUID>
-            const pathMatch =
-                url.pathname.match(
-                    new RegExp(
-                        `/c/(${UUID_PATTERN})`
-                    )
-                );
+            const pathMatch = url.pathname.match(new RegExp(`/c/(${UUID_PATTERN})`));
 
             if (pathMatch?.[1]) {
-                captureConversation(
-                    pathMatch[1],
-                    'browser URL'
-                );
+                captureConversation(pathMatch[1], 'browser URL');
 
                 return;
             }
 
             // Conversation ID query parameters.
-            const params = [
-                'conversationId',
-                'conversation_id'
-            ];
+            const params = ['conversationId', 'conversation_id'];
 
             for (const param of params) {
-                const id =
-                    url.searchParams.get(
-                        param
-                    );
+                const id = url.searchParams.get(param);
 
-                if (
-                    isConversationId(id)
-                ) {
-                    captureConversation(
-                        id,
-                        `URL ${param}`
-                    );
+                if (isConversationId(id)) {
+                    captureConversation(id, `URL ${param}`);
 
                     return;
                 }
             }
-
         } catch (_) {}
     }
 
     // ============================================================
-    // NETWORK URL INSPECTION
+    // TEMPORARY CHAT REQUEST INSPECTION
     // ============================================================
 
-    function inspectNetworkUrl(url) {
-        if (
-            !url ||
-            typeof url !== 'string'
-        ) {
-            return;
-        }
-
+    function isConversationPrepareRequest(url, method) {
         try {
-            const patterns = [
-                new RegExp(
-                    `/backend-api/conversation/(${UUID_PATTERN})`
-                ),
+            const requestUrl = new URL(url, location.origin);
 
-                new RegExp(
-                    `/conversation/(${UUID_PATTERN})`
-                ),
-
-                new RegExp(
-                    `/c/(${UUID_PATTERN})`
-                )
-            ];
-
-            for (const pattern of patterns) {
-                const match =
-                    url.match(pattern);
-
-                if (match?.[1]) {
-                    captureConversation(
-                        match[1],
-                        'network request'
-                    );
-
-                    return;
-                }
-            }
-
-        } catch (_) {}
+            return (
+                String(method || 'GET').toUpperCase() === 'POST' &&
+                requestUrl.origin === location.origin &&
+                requestUrl.pathname === '/backend-api/f/conversation/prepare'
+            );
+        } catch (_) {
+            return false;
+        }
     }
 
-    // ============================================================
-    // PAYLOAD INSPECTION
-    // ============================================================
-
-    function inspectPayload(
-        payload,
-        source
-    ) {
-        if (!payload) {
+    function inspectConversationPrepareRequest(url, method, payload, source) {
+        if (!payload || !isConversationPrepareRequest(url, method)) {
             return;
         }
 
         let text;
 
-        if (
-            typeof payload ===
-            'string'
-        ) {
+        if (typeof payload === 'string') {
             text = payload;
-
         } else {
             try {
-                text =
-                    JSON.stringify(
-                        payload
-                    );
-
+                text = JSON.stringify(payload);
             } catch (_) {
                 return;
             }
         }
 
-        // Temporary Chat flags.
-        if (
-            /"is_temporary"\s*:\s*true/i.test(text) ||
-            /"temporary"\s*:\s*true/i.test(text) ||
-            /"temporary_chat"\s*:\s*true/i.test(text)
-        ) {
-            currentIsTemporary = true;
+        if (!/"history_and_training_disabled"\s*:\s*true/i.test(text)) {
+            return;
         }
 
-        // Conversation ID patterns.
-        const patterns = [
-            new RegExp(
-                `"conversation_id"\\s*:\\s*"(${UUID_PATTERN})"`,
-                'i'
-            ),
+        const match = text.match(new RegExp(`"conversation_id"\\s*:\\s*"(${UUID_PATTERN})"`, 'i'));
 
-            new RegExp(
-                `"conversationId"\\s*:\\s*"(${UUID_PATTERN})"`,
-                'i'
-            ),
-
-            new RegExp(
-                `"conversation"\\s*:\\s*"(${UUID_PATTERN})"`,
-                'i'
-            )
-        ];
-
-        for (const pattern of patterns) {
-            const match =
-                text.match(pattern);
-
-            if (match?.[1]) {
-                captureConversation(
-                    match[1],
-                    source
-                );
-
-                return;
-            }
+        if (match?.[1]) {
+            captureConversation(match[1], source, true);
         }
     }
 
@@ -391,9 +216,7 @@
             return false;
         }
 
-        return new RegExp(
-            `^${UUID_PATTERN}$`
-        ).test(value);
+        return new RegExp(`^${UUID_PATTERN}$`).test(value);
     }
 
     // ============================================================
@@ -402,265 +225,166 @@
 
     function detectFirstPrompt() {
         try {
-            if (
-                !currentConversationId
-            ) {
+            if (!currentConversationId) {
                 return null;
             }
 
-            const nodes =
-                document.querySelectorAll(
-                    '[data-message-author-role="user"]'
-                );
+            const nodes = document.querySelectorAll('[data-message-author-role="user"]');
 
             if (!nodes.length) {
                 return null;
             }
 
-            const text =
-                nodes[0]
-                    .innerText
-                    ?.trim()
-                    .replace(
-                        /\s+/g,
-                        ' '
-                    );
+            const text = nodes[0].innerText?.trim().replace(/\s+/g, ' ');
 
             if (!text) {
                 return null;
             }
 
-            const newPrompt =
-                text.length > 180
-                    ? text.substring(
-                        0,
-                        180
-                    ) + '…'
-                    : text;
+            const newPrompt = text.length > 180 ? text.substring(0, 180) + '…' : text;
 
-            if (
-                newPrompt !==
-                firstPrompt
-            ) {
-                firstPrompt =
-                    newPrompt;
+            if (newPrompt !== firstPrompt) {
+                firstPrompt = newPrompt;
 
-                console.log(
-                    '[Temp History] First prompt:',
-                    firstPrompt
-                );
+                console.log('[Temp History] First prompt:', firstPrompt);
 
                 updateCurrentHistoryEntry();
             }
 
             return firstPrompt;
-
         } catch (_) {
             return null;
         }
     }
 
     function startPromptObserver() {
-        const observer =
-            new MutationObserver(
-                () => {
-                    detectTemporaryUI();
-
-                    if (
-                        currentConversationId &&
-                        !firstPrompt
-                    ) {
-                        detectFirstPrompt();
-                    }
-                }
-            );
-
-        observer.observe(
-            document.documentElement,
-            {
-                childList: true,
-                subtree: true
+        const observer = new MutationObserver(() => {
+            if (currentConversationId && !firstPrompt) {
+                detectFirstPrompt();
             }
-        );
+        });
+
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+        });
     }
 
     // ============================================================
     // SAVE / UPDATE CONVERSATION
     // ============================================================
 
-    function captureConversation(
-        id,
-        source
-    ) {
-        if (
-            !isConversationId(id)
-        ) {
+    function captureConversation(id, source, temporaryEvidence = false) {
+        if (!isConversationId(id)) {
             return;
         }
 
         // If backend suddenly switches IDs,
         // clear the previous title immediately.
-        if (
-            currentConversationId &&
-            currentConversationId !== id
-        ) {
-            console.log(
-                '[Temp History] Conversation changed:',
-                currentConversationId,
-                '→',
-                id
-            );
+        if (currentConversationId && currentConversationId !== id) {
+            console.log('[Temp History] Conversation changed:', currentConversationId, '→', id);
 
             firstPrompt = null;
+            currentIsTemporary = false;
         }
 
-        currentConversationId =
-            id;
+        currentConversationId = id;
+
+        if (temporaryEvidence) {
+            temporaryConversationIds.add(id);
+        }
 
         detectTemporaryFromLocation();
-        detectTemporaryUI();
 
-        if (
-            TEMP_ONLY &&
-            !currentIsTemporary
-        ) {
+        if (currentIsTemporary) {
+            temporaryConversationIds.add(id);
+        }
+
+        if (TEMP_ONLY && !temporaryConversationIds.has(id)) {
             return;
         }
 
-        const history =
-            getHistory();
+        currentIsTemporary = true;
 
-        const now =
-            new Date().toISOString();
+        const history = getHistory();
 
-        const existing =
-            history.find(
-                item =>
-                    item.id === id
-            );
+        const now = new Date().toISOString();
 
-        const canonicalUrl =
-            `${location.origin}/c/${id}`;
+        const existing = history.find(item => item.id === id);
+
+        const canonicalUrl = `${location.origin}/c/${id}`;
 
         if (existing) {
-            existing.lastSeen =
-                now;
+            existing.lastSeen = now;
 
-            existing.url =
-                canonicalUrl;
+            existing.url = canonicalUrl;
 
-            existing.originalUrl =
-                existing.originalUrl ||
-                location.href;
+            existing.originalUrl = existing.originalUrl || location.href;
 
-            existing.source =
-                source;
+            existing.source = source;
 
-            existing.detectCount =
-                (
-                    existing.detectCount ||
-                    0
-                ) + 1;
+            existing.detectCount = (existing.detectCount || 0) + 1;
 
-            existing.temporary =
-                true;
+            existing.temporary = true;
 
             // IMPORTANT:
             // Only assign title if we have
             // positively detected a new prompt.
             if (firstPrompt) {
-                existing.title =
-                    firstPrompt;
+                existing.title = firstPrompt;
             }
-
         } else {
             history.unshift({
                 id,
 
-                title:
-                    firstPrompt ||
-                    'Temporary Chat',
+                title: firstPrompt || 'Temporary Chat',
 
-                url:
-                    canonicalUrl,
+                url: canonicalUrl,
 
-                originalUrl:
-                    location.href,
+                originalUrl: location.href,
 
-                created:
-                    now,
+                created: now,
 
-                lastSeen:
-                    now,
+                lastSeen: now,
 
-                temporary:
-                    true,
+                temporary: true,
 
                 source,
 
-                detectCount:
-                    1
+                detectCount: 1,
             });
         }
 
-        history.sort(
-            (a, b) =>
-                new Date(
-                    b.lastSeen
-                ) -
-                new Date(
-                    a.lastSeen
-                )
-        );
+        history.sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen));
 
         saveHistory(history);
 
         updateMiniPanel();
 
         // Wait for the NEW chat DOM.
-        setTimeout(
-            detectFirstPrompt,
-            500
-        );
+        setTimeout(detectFirstPrompt, 500);
 
-        setTimeout(
-            detectFirstPrompt,
-            1200
-        );
+        setTimeout(detectFirstPrompt, 1200);
 
-        setTimeout(
-            detectFirstPrompt,
-            2500
-        );
+        setTimeout(detectFirstPrompt, 2500);
     }
 
     function updateCurrentHistoryEntry() {
-        if (
-            !currentConversationId ||
-            !firstPrompt
-        ) {
+        if (!currentConversationId || !firstPrompt) {
             return;
         }
 
-        const history =
-            getHistory();
+        const history = getHistory();
 
-        const entry =
-            history.find(
-                item =>
-                    item.id ===
-                    currentConversationId
-            );
+        const entry = history.find(item => item.id === currentConversationId);
 
         if (!entry) {
             return;
         }
 
-        entry.title =
-            firstPrompt;
+        entry.title = firstPrompt;
 
-        entry.lastSeen =
-            new Date().toISOString();
+        entry.lastSeen = new Date().toISOString();
 
         saveHistory(history);
 
@@ -672,248 +396,114 @@
     // FETCH INTERCEPTION
     // ============================================================
 
-    const originalFetch =
-        win.fetch;
+    const originalFetch = win.fetch;
 
     if (originalFetch) {
-        win.fetch =
-            async function (...args) {
-                try {
-                    const input =
-                        args[0];
+        win.fetch = async function (...args) {
+            try {
+                const input = args[0];
+                const requestUrl = typeof input === 'string' ? input : input?.url;
+                const method = args[1]?.method || input?.method || 'GET';
+                const body = args[1]?.body;
 
-                    const requestUrl =
-                        typeof input ===
-                        'string'
-                            ? input
-                            : input?.url;
-
-                    inspectNetworkUrl(
-                        requestUrl
-                    );
-
-                    if (
-                        args[1]?.body
-                    ) {
-                        inspectPayload(
-                            args[1].body,
-                            'fetch request'
-                        );
-                    }
-
-                } catch (_) {}
-
-                const response =
-                    await originalFetch.apply(
-                        this,
-                        args
-                    );
-
-                try {
-                    inspectNetworkUrl(
-                        response.url
-                    );
-
-                    const contentType =
-                        response.headers
-                            ?.get(
-                                'content-type'
-                            ) || '';
-
-                    if (
-                        contentType.includes(
-                            'json'
-                        ) ||
-                        contentType.includes(
-                            'text/event-stream'
-                        )
-                    ) {
-                        response
-                            .clone()
-                            .text()
-                            .then(
-                                text => {
-                                    inspectPayload(
-                                        text,
-                                        'fetch response'
-                                    );
-                                }
-                            )
-                            .catch(
-                                () => {}
+                if (body) {
+                    inspectConversationPrepareRequest(requestUrl, method, body, 'prepare request');
+                } else if (
+                    isConversationPrepareRequest(requestUrl, method) &&
+                    typeof input?.clone === 'function'
+                ) {
+                    input
+                        .clone()
+                        .text()
+                        .then(text => {
+                            inspectConversationPrepareRequest(
+                                requestUrl,
+                                method,
+                                text,
+                                'prepare request'
                             );
-                    }
+                        })
+                        .catch(() => {});
+                }
+            } catch (_) {}
 
-                } catch (_) {}
-
-                return response;
-            };
+            return originalFetch.apply(this, args);
+        };
     }
 
     // ============================================================
     // XHR INTERCEPTION
     // ============================================================
 
-    const originalOpen =
-        win.XMLHttpRequest
-            .prototype
-            .open;
+    const originalOpen = win.XMLHttpRequest.prototype.open;
 
-    const originalSend =
-        win.XMLHttpRequest
-            .prototype
-            .send;
+    const originalSend = win.XMLHttpRequest.prototype.send;
 
-    win.XMLHttpRequest
-        .prototype
-        .open =
-        function (
-            method,
-            url,
-            ...args
-        ) {
-            this.__tempHistoryUrl =
-                url;
+    win.XMLHttpRequest.prototype.open = function (method, url, ...args) {
+        this.__tempHistoryUrl = url;
+        this.__tempHistoryMethod = method;
 
-            inspectNetworkUrl(url);
+        return originalOpen.call(this, method, url, ...args);
+    };
 
-            return originalOpen.call(
-                this,
-                method,
-                url,
-                ...args
+    win.XMLHttpRequest.prototype.send = function (body) {
+        try {
+            inspectConversationPrepareRequest(
+                this.__tempHistoryUrl,
+                this.__tempHistoryMethod,
+                body,
+                'prepare XHR request'
             );
-        };
+        } catch (_) {}
 
-    win.XMLHttpRequest
-        .prototype
-        .send =
-        function (body) {
-            try {
-                if (body) {
-                    inspectPayload(
-                        body,
-                        'XHR request'
-                    );
-                }
-
-                this.addEventListener(
-                    'load',
-                    () => {
-                        try {
-                            inspectNetworkUrl(
-                                this.responseURL
-                            );
-
-                            if (
-                                typeof this
-                                    .responseText ===
-                                'string'
-                            ) {
-                                inspectPayload(
-                                    this.responseText,
-                                    'XHR response'
-                                );
-                            }
-
-                        } catch (_) {}
-                    }
-                );
-
-            } catch (_) {}
-
-            return originalSend.call(
-                this,
-                body
-            );
-        };
+        return originalSend.call(this, body);
+    };
 
     // ============================================================
     // SPA NAVIGATION DETECTION
     // ============================================================
 
-    const originalPushState =
-        win.history
-            .pushState;
+    const originalPushState = win.history.pushState;
 
-    const originalReplaceState =
-        win.history
-            .replaceState;
+    const originalReplaceState = win.history.replaceState;
 
-    win.history.pushState =
-        function (...args) {
-            const result =
-                originalPushState.apply(
-                    this,
-                    args
-                );
+    win.history.pushState = function (...args) {
+        const result = originalPushState.apply(this, args);
 
-            resetConversationState();
+        resetConversationState();
 
-            lastKnownLocation =
-                location.pathname +
-                location.search;
+        lastKnownLocation = location.pathname + location.search;
 
-            setTimeout(
-                inspectCurrentUrl,
-                100
-            );
+        setTimeout(inspectCurrentUrl, 100);
 
-            setTimeout(
-                detectFirstPrompt,
-                800
-            );
+        setTimeout(detectFirstPrompt, 800);
 
-            return result;
-        };
+        return result;
+    };
 
-    win.history.replaceState =
-        function (...args) {
-            const result =
-                originalReplaceState.apply(
-                    this,
-                    args
-                );
+    win.history.replaceState = function (...args) {
+        const result = originalReplaceState.apply(this, args);
 
-            resetConversationState();
+        resetConversationState();
 
-            lastKnownLocation =
-                location.pathname +
-                location.search;
+        lastKnownLocation = location.pathname + location.search;
 
-            setTimeout(
-                inspectCurrentUrl,
-                100
-            );
+        setTimeout(inspectCurrentUrl, 100);
 
-            setTimeout(
-                detectFirstPrompt,
-                800
-            );
+        setTimeout(detectFirstPrompt, 800);
 
-            return result;
-        };
+        return result;
+    };
 
-    win.addEventListener(
-        'popstate',
-        () => {
-            resetConversationState();
+    win.addEventListener('popstate', () => {
+        resetConversationState();
 
-            lastKnownLocation =
-                location.pathname +
-                location.search;
+        lastKnownLocation = location.pathname + location.search;
 
-            setTimeout(
-                inspectCurrentUrl,
-                100
-            );
+        setTimeout(inspectCurrentUrl, 100);
 
-            setTimeout(
-                detectFirstPrompt,
-                800
-            );
-        }
-    );
+        setTimeout(detectFirstPrompt, 800);
+    });
 
     // ============================================================
     // HEADER HISTORY BUTTON
@@ -998,6 +588,21 @@
     }
 
     function getHeaderAnchor() {
+        const obstacles = Array.from(
+            document.querySelectorAll(
+                '[data-page-shell-header-obstacle="true"], [data-app-shell-header-obstacle="true"]'
+            )
+        ).filter(isVisibleHeaderControl);
+
+        if (obstacles.length) {
+            return obstacles
+                .map(element => ({
+                    element,
+                    rect: element.getBoundingClientRect(),
+                }))
+                .sort((a, b) => a.rect.top - b.rect.top)[0].element;
+        }
+
         const controls = Array.from(
             document.querySelectorAll('button, [role="button"], a[role="button"]')
         ).filter(isVisibleHeaderControl);
@@ -1024,20 +629,22 @@
 
         const candidates = known.length ? known : controls;
 
-        return candidates
-            .map(element => ({
-                element,
-                rect: element.getBoundingClientRect(),
-            }))
-            .sort((a, b) => {
-                const topDelta = Math.abs(a.rect.top - b.rect.top);
+        return (
+            candidates
+                .map(element => ({
+                    element,
+                    rect: element.getBoundingClientRect(),
+                }))
+                .sort((a, b) => {
+                    const topDelta = Math.abs(a.rect.top - b.rect.top);
 
-                if (topDelta > 12) {
-                    return a.rect.top - b.rect.top;
-                }
+                    if (topDelta > 12) {
+                        return a.rect.top - b.rect.top;
+                    }
 
-                return a.rect.left - b.rect.left;
-            })[0]?.element || null;
+                    return a.rect.left - b.rect.left;
+                })[0]?.element || null
+        );
     }
 
     function positionHistoryButton() {
@@ -1165,62 +772,39 @@
 
         renderHistory();
 
-        historyModal.style.display =
-            'flex';
+        historyModal.style.display = 'flex';
 
-        setTimeout(
-            () => {
-                historyModal
-                    .querySelector(
-                        '#temp-history-search'
-                    )
-                    ?.focus();
-            },
-            50
-        );
+        setTimeout(() => {
+            historyModal.querySelector('#temp-history-search')?.focus();
+        }, 50);
     }
 
     function closeHistory() {
         if (historyModal) {
-            historyModal.style.display =
-                'none';
+            historyModal.style.display = 'none';
         }
     }
 
     function createHistoryModal() {
-        historyModal =
-            document.createElement(
-                'div'
-            );
+        historyModal = document.createElement('div');
 
-        Object.assign(
-            historyModal.style,
-            {
-                position:
-                    'fixed',
+        Object.assign(historyModal.style, {
+            position: 'fixed',
 
-                inset:
-                    '0',
+            inset: '0',
 
-                zIndex:
-                    '2147483647',
+            zIndex: '2147483647',
 
-                background:
-                    'rgba(0,0,0,.60)',
+            background: 'rgba(0,0,0,.60)',
 
-                display:
-                    'none',
+            display: 'none',
 
-                alignItems:
-                    'center',
+            alignItems: 'center',
 
-                justifyContent:
-                    'center',
+            justifyContent: 'center',
 
-                fontFamily:
-                    'system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
-            }
-        );
+            fontFamily: 'system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+        });
 
         historyModal.innerHTML = `
             <div
@@ -1330,98 +914,47 @@
             </div>
         `;
 
-        document.body.appendChild(
-            historyModal
-        );
+        document.body.appendChild(historyModal);
 
-        historyModal
-            .querySelector(
-                '#temp-close'
-            )
-            .onclick =
-            closeHistory;
+        historyModal.querySelector('#temp-close').onclick = closeHistory;
 
-        historyModal
-            .querySelector(
-                '#temp-export'
-            )
-            .onclick =
-            exportHistory;
+        historyModal.querySelector('#temp-export').onclick = exportHistory;
 
-        historyModal
-            .querySelector(
-                '#temp-import'
-            )
-            .onclick =
-            importHistory;
+        historyModal.querySelector('#temp-import').onclick = importHistory;
 
-        historyModal
-            .querySelector(
-                '#temp-history-search'
-            )
-            .addEventListener(
-                'input',
-                renderHistory
-            );
+        historyModal.querySelector('#temp-history-search').addEventListener('input', renderHistory);
 
-        historyModal.addEventListener(
-            'click',
-            event => {
-                if (
-                    event.target ===
-                    historyModal
-                ) {
-                    closeHistory();
-                }
+        historyModal.addEventListener('click', event => {
+            if (event.target === historyModal) {
+                closeHistory();
             }
-        );
+        });
 
-        document.addEventListener(
-            'keydown',
-            event => {
-                if (
-                    event.key ===
-                    'Escape'
-                ) {
-                    closeHistory();
-                }
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                closeHistory();
             }
-        );
+        });
 
         styleModalButtons();
     }
 
     function styleModalButtons() {
-        historyModal
-            ?.querySelectorAll(
-                'button'
-            )
-            .forEach(
-                button => {
-                    Object.assign(
-                        button.style,
-                        {
-                            background:
-                                '#343541',
+        historyModal?.querySelectorAll('button').forEach(button => {
+            Object.assign(button.style, {
+                background: '#343541',
 
-                            color:
-                                '#fff',
+                color: '#fff',
 
-                            border:
-                                '1px solid rgba(255,255,255,.15)',
+                border: '1px solid rgba(255,255,255,.15)',
 
-                            padding:
-                                '7px 10px',
+                padding: '7px 10px',
 
-                            borderRadius:
-                                '6px',
+                borderRadius: '6px',
 
-                            cursor:
-                                'pointer'
-                        }
-                    );
-                }
-            );
+                cursor: 'pointer',
+            });
+        });
     }
 
     // ============================================================
@@ -1433,52 +966,25 @@
             return;
         }
 
-        const list =
-            historyModal.querySelector(
-                '#temp-history-list'
-            );
+        const list = historyModal.querySelector('#temp-history-list');
 
         if (!list) {
             return;
         }
 
-        let history =
-            getHistory();
+        let history = getHistory();
 
-        const search =
-            historyModal
-                .querySelector(
-                    '#temp-history-search'
-                )
-                ?.value
-                ?.toLowerCase()
-                ?.trim();
+        const search = historyModal
+            .querySelector('#temp-history-search')
+            ?.value?.toLowerCase()
+            ?.trim();
 
         if (search) {
-            history =
-                history.filter(
-                    item =>
-                        (
-                            (
-                                item.title ||
-                                ''
-                            ) +
-                            ' ' +
-                            (
-                                item.id ||
-                                ''
-                            ) +
-                            ' ' +
-                            (
-                                item.url ||
-                                ''
-                            )
-                        )
-                            .toLowerCase()
-                            .includes(
-                                search
-                            )
-                );
+            history = history.filter(item =>
+                ((item.title || '') + ' ' + (item.id || '') + ' ' + (item.url || ''))
+                    .toLowerCase()
+                    .includes(search)
+            );
         }
 
         if (!history.length) {
@@ -1497,25 +1003,15 @@
             return;
         }
 
-        list.innerHTML =
-            history
-                .map(
-                    item => {
-                        const created =
-                            formatDate(
-                                item.created
-                            );
+        list.innerHTML = history
+            .map(item => {
+                const created = formatDate(item.created);
 
-                        const lastSeen =
-                            formatDate(
-                                item.lastSeen
-                            );
+                const lastSeen = formatDate(item.lastSeen);
 
-                        return `
+                return `
                             <div
-                                data-id="${escapeHtml(
-                                    item.id
-                                )}"
+                                data-id="${escapeHtml(item.id)}"
                                 style="
                                     padding:14px 4px;
                                     border-bottom:1px solid rgba(255,255,255,.10);
@@ -1546,15 +1042,9 @@
                                                 text-overflow:ellipsis;
                                                 white-space:nowrap;
                                             "
-                                            title="${escapeHtml(
-                                                item.title ||
-                                                'Temporary Chat'
-                                            )}"
+                                            title="${escapeHtml(item.title || 'Temporary Chat')}"
                                         >
-                                            ${escapeHtml(
-                                                item.title ||
-                                                'Temporary Chat'
-                                            )}
+                                            ${escapeHtml(item.title || 'Temporary Chat')}
                                         </div>
 
                                         <div
@@ -1565,9 +1055,7 @@
                                                 margin-bottom:4px;
                                             "
                                         >
-                                            ${escapeHtml(
-                                                item.id
-                                            )}
+                                            ${escapeHtml(item.id)}
                                         </div>
 
                                         <div
@@ -1591,25 +1079,13 @@
                                         "
                                     >
 
-                                        ${smallButton(
-                                            'Open',
-                                            'open'
-                                        )}
+                                        ${smallButton('Open', 'open')}
 
-                                        ${smallButton(
-                                            'Copy URL',
-                                            'copy-url'
-                                        )}
+                                        ${smallButton('Copy URL', 'copy-url')}
 
-                                        ${smallButton(
-                                            'Copy ID',
-                                            'copy-id'
-                                        )}
+                                        ${smallButton('Copy ID', 'copy-id')}
 
-                                        ${smallButton(
-                                            'Delete',
-                                            'delete'
-                                        )}
+                                        ${smallButton('Delete', 'delete')}
 
                                     </div>
 
@@ -1617,52 +1093,25 @@
 
                             </div>
                         `;
-                    }
-                )
-                .join('');
+            })
+            .join('');
 
-        list
-            .querySelectorAll(
-                '[data-action]'
-            )
-            .forEach(
-                button => {
-                    button.addEventListener(
-                        'click',
-                        event => {
-                            const action =
-                                event
-                                    .currentTarget
-                                    .dataset
-                                    .action;
+        list.querySelectorAll('[data-action]').forEach(button => {
+            button.addEventListener('click', event => {
+                const action = event.currentTarget.dataset.action;
 
-                            const row =
-                                event
-                                    .currentTarget
-                                    .closest(
-                                        '[data-id]'
-                                    );
+                const row = event.currentTarget.closest('[data-id]');
 
-                            const id =
-                                row?.dataset
-                                    ?.id;
+                const id = row?.dataset?.id;
 
-                            if (id) {
-                                handleHistoryAction(
-                                    action,
-                                    id
-                                );
-                            }
-                        }
-                    );
+                if (id) {
+                    handleHistoryAction(action, id);
                 }
-            );
+            });
+        });
     }
 
-    function smallButton(
-        label,
-        action
-    ) {
+    function smallButton(label, action) {
         return `
             <button
                 data-action="${action}"
@@ -1685,18 +1134,10 @@
     // HISTORY ACTIONS
     // ============================================================
 
-    function handleHistoryAction(
-        action,
-        id
-    ) {
-        const history =
-            getHistory();
+    function handleHistoryAction(action, id) {
+        const history = getHistory();
 
-        const item =
-            history.find(
-                entry =>
-                    entry.id === id
-            );
+        const item = history.find(entry => entry.id === id);
 
         if (!item) {
             return;
@@ -1704,40 +1145,22 @@
 
         switch (action) {
             case 'open':
-                window.open(
-                    item.url,
-                    '_blank'
-                );
+                window.open(item.url, '_blank');
                 break;
 
             case 'copy-url':
-                copyText(
-                    item.url
-                );
+                copyText(item.url);
                 break;
 
             case 'copy-id':
-                copyText(
-                    item.id
-                );
+                copyText(item.id);
                 break;
 
             case 'delete':
-                if (
-                    confirm(
-                        'Delete this temporary chat from local history?'
-                    )
-                ) {
-                    const updated =
-                        history.filter(
-                            entry =>
-                                entry.id !==
-                                id
-                        );
+                if (confirm('Delete this temporary chat from local history?')) {
+                    const updated = history.filter(entry => entry.id !== id);
 
-                    saveHistory(
-                        updated
-                    );
+                    saveHistory(updated);
 
                     renderHistory();
                     updateMiniPanel();
@@ -1752,71 +1175,33 @@
     // ============================================================
 
     function exportHistory() {
-        const history =
-            getHistory();
+        const history = getHistory();
 
         const exportData = {
-            version:
-                '2.1',
+            version: '2.1',
 
-            exported:
-                new Date()
-                    .toISOString(),
+            exported: new Date().toISOString(),
 
-            count:
-                history.length,
+            count: history.length,
 
-            chats:
-                history
+            chats: history,
         };
 
-        const blob =
-            new Blob(
-                [
-                    JSON.stringify(
-                        exportData,
-                        null,
-                        2
-                    )
-                ],
-                {
-                    type:
-                        'application/json'
-                }
-            );
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json',
+        });
 
-        const url =
-            URL.createObjectURL(
-                blob
-            );
+        const url = URL.createObjectURL(blob);
 
-        const a =
-            document.createElement(
-                'a'
-            );
+        const a = document.createElement('a');
 
-        a.href =
-            url;
+        a.href = url;
 
-        a.download =
-            `chatgpt-temporary-history-${
-                new Date()
-                    .toISOString()
-                    .slice(
-                        0,
-                        10
-                    )
-            }.json`;
+        a.download = `chatgpt-temporary-history-${new Date().toISOString().slice(0, 10)}.json`;
 
         a.click();
 
-        setTimeout(
-            () =>
-                URL.revokeObjectURL(
-                    url
-                ),
-            1000
-        );
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     // ============================================================
@@ -1824,144 +1209,72 @@
     // ============================================================
 
     function importHistory() {
-        const input =
-            document.createElement(
-                'input'
-            );
+        const input = document.createElement('input');
 
-        input.type =
-            'file';
+        input.type = 'file';
 
-        input.accept =
-            '.json';
+        input.accept = '.json';
 
-        input.onchange =
-            async event => {
-                const file =
-                    event.target
-                        .files?.[0];
+        input.onchange = async event => {
+            const file = event.target.files?.[0];
 
-                if (!file) {
-                    return;
+            if (!file) {
+                return;
+            }
+
+            try {
+                const text = await file.text();
+
+                const data = JSON.parse(text);
+
+                const imported = Array.isArray(data) ? data : data.chats;
+
+                if (!Array.isArray(imported)) {
+                    throw new Error('Invalid history file');
                 }
 
-                try {
-                    const text =
-                        await file.text();
+                const existing = getHistory();
 
-                    const data =
-                        JSON.parse(
-                            text
-                        );
+                const merged = new Map();
 
-                    const imported =
-                        Array.isArray(data)
-                            ? data
-                            : data.chats;
-
-                    if (
-                        !Array.isArray(
-                            imported
-                        )
-                    ) {
-                        throw new Error(
-                            'Invalid history file'
-                        );
+                [...existing, ...imported].forEach(item => {
+                    if (!item || !item.id) {
+                        return;
                     }
 
-                    const existing =
-                        getHistory();
+                    const previous = merged.get(item.id);
 
-                    const merged =
-                        new Map();
+                    if (!previous) {
+                        merged.set(item.id, item);
 
-                    [
-                        ...existing,
-                        ...imported
-                    ].forEach(
-                        item => {
-                            if (
-                                !item ||
-                                !item.id
-                            ) {
-                                return;
-                            }
+                        return;
+                    }
 
-                            const previous =
-                                merged.get(
-                                    item.id
-                                );
+                    const currentTime = new Date(item.lastSeen || item.created || 0).getTime();
 
-                            if (
-                                !previous
-                            ) {
-                                merged.set(
-                                    item.id,
-                                    item
-                                );
+                    const previousTime = new Date(
+                        previous.lastSeen || previous.created || 0
+                    ).getTime();
 
-                                return;
-                            }
+                    if (currentTime > previousTime) {
+                        merged.set(item.id, item);
+                    }
+                });
 
-                            const currentTime =
-                                new Date(
-                                    item.lastSeen ||
-                                    item.created ||
-                                    0
-                                ).getTime();
+                const result = Array.from(merged.values()).sort(
+                    (a, b) => new Date(b.lastSeen || b.created) - new Date(a.lastSeen || a.created)
+                );
 
-                            const previousTime =
-                                new Date(
-                                    previous.lastSeen ||
-                                    previous.created ||
-                                    0
-                                ).getTime();
+                saveHistory(result);
 
-                            if (
-                                currentTime >
-                                previousTime
-                            ) {
-                                merged.set(
-                                    item.id,
-                                    item
-                                );
-                            }
-                        }
-                    );
+                renderHistory();
+                updateMiniPanel();
 
-                    const result =
-                        Array.from(
-                            merged.values()
-                        ).sort(
-                            (a, b) =>
-                                new Date(
-                                    b.lastSeen ||
-                                    b.created
-                                ) -
-                                new Date(
-                                    a.lastSeen ||
-                                    a.created
-                                )
-                        );
-
-                    saveHistory(
-                        result
-                    );
-
-                    renderHistory();
-                    updateMiniPanel();
-
-                    alert(
-                        `${imported.length} record(s) imported.`
-                    );
-
-                } catch (error) {
-                    alert(
-                        'Unable to import history file:\n' +
-                        error.message
-                    );
-                }
-            };
+                alert(`${imported.length} record(s) imported.`);
+            } catch (error) {
+                alert('Unable to import history file:\n' + error.message);
+            }
+        };
 
         input.click();
     }
@@ -1972,16 +1285,9 @@
 
     function copyText(text) {
         try {
-            GM_setClipboard(
-                text
-            );
-
+            GM_setClipboard(text);
         } catch (_) {
-            navigator
-                .clipboard
-                ?.writeText(
-                    text
-                );
+            navigator.clipboard?.writeText(text);
         }
     }
 
@@ -1991,39 +1297,19 @@
         }
 
         try {
-            return new Date(
-                value
-            ).toLocaleString();
-
+            return new Date(value).toLocaleString();
         } catch (_) {
             return value;
         }
     }
 
     function escapeHtml(value) {
-        return String(
-            value ?? ''
-        )
-            .replace(
-                /&/g,
-                '&amp;'
-            )
-            .replace(
-                /</g,
-                '&lt;'
-            )
-            .replace(
-                />/g,
-                '&gt;'
-            )
-            .replace(
-                /"/g,
-                '&quot;'
-            )
-            .replace(
-                /'/g,
-                '&#039;'
-            );
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     // ============================================================
@@ -2037,36 +1323,19 @@
 
         startPromptObserver();
 
-        const waitForBody =
-            setInterval(
-                () => {
-                    if (
-                        document.body
-                    ) {
-                        clearInterval(
-                            waitForBody
-                        );
+        const waitForBody = setInterval(() => {
+            if (document.body) {
+                clearInterval(waitForBody);
 
-                        createMiniPanel();
-                        startButtonPositionObserver();
+                createMiniPanel();
+                startButtonPositionObserver();
 
-                        inspectCurrentUrl();
+                inspectCurrentUrl();
 
-                        setTimeout(
-                            detectTemporaryUI,
-                            500
-                        );
-
-                        setTimeout(
-                            detectFirstPrompt,
-                            1000
-                        );
-                    }
-                },
-                100
-            );
+                setTimeout(detectFirstPrompt, 1000);
+            }
+        }, 100);
     }
 
     initialize();
-
 })();

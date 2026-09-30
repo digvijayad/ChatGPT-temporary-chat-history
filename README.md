@@ -97,9 +97,9 @@ Exporting history creates a local JSON download. Treat exported files as potenti
 
 ## How It Works
 
-The userscript observes ChatGPT navigation state, URLs, Temporary Chat indicators, relevant browser activity, and the first user message. It stores detected entries with Tampermonkey's `GM_getValue` and `GM_setValue` APIs.
+When ChatGPT prepares a new message, the userscript inspects the exact `POST /backend-api/f/conversation/prepare` request. It stores the included `conversation_id` only when that same request contains `history_and_training_disabled: true`. Normal prepare requests omit that field and are ignored. Explicit Temporary Chat URL parameters are also supported.
 
-The history button is not inserted into ChatGPT's React component hierarchy. Instead, the script locates the active native header controls, positions the button beside them, and updates that position as the interface changes.
+The history button is not inserted into ChatGPT's React component hierarchy. Instead, the script anchors it beside ChatGPT's page/app-shell header obstacle and updates that position as the interface changes.
 
 ## Development
 

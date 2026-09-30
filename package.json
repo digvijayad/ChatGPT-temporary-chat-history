@@ -1,6 +1,6 @@
 {
     "name": "chatgpt-temporary-chat-history",
-    "version": "2.3.1",
+    "version": "2.3.2",
     "private": true,
     "description": "Tampermonkey userscript that keeps a local recovery history for ChatGPT Temporary Chats.",
     "license": "MIT",
