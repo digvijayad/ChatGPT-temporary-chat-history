@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic versioning where practical.
 
+## [2.3.3] - 2026-09-30
+
+### Fixed
+
+- Restores `history_and_training_disabled: true` when continuing a locally saved Temporary Chat if ChatGPT omits the flag after reopening its URL.
+- Handles both `POST /backend-api/f/conversation` and `POST /backend-api/f/conversation/prepare` request variants.
+- Leaves regular and unknown conversation requests unchanged.
+
 ## [2.3.2] - 2026-09-30
 
 ### Fixed

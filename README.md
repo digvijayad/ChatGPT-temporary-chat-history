@@ -47,6 +47,7 @@ The clock button stays beside ChatGPT's native header controls. Its badge shows 
 - Repositions automatically as the ChatGPT header changes.
 - Searches saved titles, conversation IDs, and URLs.
 - Opens saved conversations and copies their URL or ID.
+- Restores the Temporary Chat request flag when continuing a locally saved Temporary Chat.
 - Deletes individual entries and imports or exports history as JSON.
 - Sends no saved history to an external service.
 
@@ -97,7 +98,7 @@ Exporting history creates a local JSON download. Treat exported files as potenti
 
 ## How It Works
 
-When ChatGPT prepares a new message, the userscript inspects the exact `POST /backend-api/f/conversation/prepare` request. It stores the included `conversation_id` only when that same request contains `history_and_training_disabled: true`. Normal prepare requests omit that field and are ignored. Explicit Temporary Chat URL parameters are also supported.
+When ChatGPT sends a message, the userscript inspects `POST /backend-api/f/conversation` and `POST /backend-api/f/conversation/prepare`. It stores the included `conversation_id` only when that same request contains `history_and_training_disabled: true`. If ChatGPT omits that flag after a locally saved Temporary Chat is reopened, the script restores it before sending the request. Requests for conversation IDs that are not recorded as temporary are left unchanged. Explicit Temporary Chat URL parameters are also supported.
 
 The history button is not inserted into ChatGPT's React component hierarchy. Instead, the script anchors it beside ChatGPT's page/app-shell header obstacle and updates that position as the interface changes.
 

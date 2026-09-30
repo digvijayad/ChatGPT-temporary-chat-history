@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Temporary Chat History
 // @namespace    https://github.com/digvijayad/ChatGPT-temporary-chat-history
-// @version      2.3.2
+// @version      2.3.3
 // @description  Saves ChatGPT Temporary Chat IDs/URLs locally so closed temporary chats can be recovered.
 // @author       Digvijay
 // @license      MIT
@@ -169,45 +169,86 @@
     // TEMPORARY CHAT REQUEST INSPECTION
     // ============================================================
 
-    function isConversationPrepareRequest(url, method) {
+    function isConversationRequest(url, method) {
         try {
             const requestUrl = new URL(url, location.origin);
 
             return (
                 String(method || 'GET').toUpperCase() === 'POST' &&
                 requestUrl.origin === location.origin &&
-                requestUrl.pathname === '/backend-api/f/conversation/prepare'
+                (requestUrl.pathname === '/backend-api/f/conversation' ||
+                    requestUrl.pathname === '/backend-api/f/conversation/prepare')
             );
         } catch (_) {
             return false;
         }
     }
 
-    function inspectConversationPrepareRequest(url, method, payload, source) {
-        if (!payload || !isConversationPrepareRequest(url, method)) {
+    function getConversationPayload(payload) {
+        if (typeof payload !== 'string') {
+            return null;
+        }
+
+        try {
+            const parsed = JSON.parse(payload);
+
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function isKnownTemporaryConversation(id) {
+        if (!isConversationId(id)) {
+            return false;
+        }
+
+        if (temporaryConversationIds.has(id)) {
+            return true;
+        }
+
+        return getHistory().some(item => item?.id === id && item?.temporary === true);
+    }
+
+    function prepareConversationPayload(url, method, payload) {
+        if (!payload || !isConversationRequest(url, method)) {
+            return payload;
+        }
+
+        const parsed = getConversationPayload(payload);
+
+        if (!parsed || !isConversationId(parsed.conversation_id)) {
+            return payload;
+        }
+
+        if (parsed.history_and_training_disabled === true) {
+            return payload;
+        }
+
+        if (!isKnownTemporaryConversation(parsed.conversation_id)) {
+            return payload;
+        }
+
+        parsed.history_and_training_disabled = true;
+
+        console.log('[Temp History] Restored Temporary Chat request flag:', parsed.conversation_id);
+
+        return JSON.stringify(parsed);
+    }
+
+    function inspectConversationRequest(url, method, payload, source) {
+        if (!payload || !isConversationRequest(url, method)) {
             return;
         }
 
-        let text;
+        const parsed = getConversationPayload(payload);
 
-        if (typeof payload === 'string') {
-            text = payload;
-        } else {
-            try {
-                text = JSON.stringify(payload);
-            } catch (_) {
-                return;
-            }
-        }
-
-        if (!/"history_and_training_disabled"\s*:\s*true/i.test(text)) {
+        if (parsed?.history_and_training_disabled !== true) {
             return;
         }
 
-        const match = text.match(new RegExp(`"conversation_id"\\s*:\\s*"(${UUID_PATTERN})"`, 'i'));
-
-        if (match?.[1]) {
-            captureConversation(match[1], source, true);
+        if (isConversationId(parsed.conversation_id)) {
+            captureConversation(parsed.conversation_id, source, true);
         }
     }
 
@@ -407,23 +448,39 @@
                 const body = args[1]?.body;
 
                 if (body) {
-                    inspectConversationPrepareRequest(requestUrl, method, body, 'prepare request');
+                    const preparedBody = prepareConversationPayload(requestUrl, method, body);
+
+                    if (preparedBody !== body) {
+                        args[1] = { ...args[1], body: preparedBody };
+                    }
+
+                    inspectConversationRequest(
+                        requestUrl,
+                        method,
+                        preparedBody,
+                        'conversation request'
+                    );
                 } else if (
-                    isConversationPrepareRequest(requestUrl, method) &&
+                    isConversationRequest(requestUrl, method) &&
                     typeof input?.clone === 'function'
                 ) {
-                    input
-                        .clone()
-                        .text()
-                        .then(text => {
-                            inspectConversationPrepareRequest(
-                                requestUrl,
-                                method,
-                                text,
-                                'prepare request'
-                            );
-                        })
-                        .catch(() => {});
+                    const requestBody = await input.clone().text();
+                    const preparedBody = prepareConversationPayload(
+                        requestUrl,
+                        method,
+                        requestBody
+                    );
+
+                    if (preparedBody !== requestBody) {
+                        args[0] = new win.Request(input, { body: preparedBody });
+                    }
+
+                    inspectConversationRequest(
+                        requestUrl,
+                        method,
+                        preparedBody,
+                        'conversation request'
+                    );
                 }
             } catch (_) {}
 
@@ -448,12 +505,20 @@
 
     win.XMLHttpRequest.prototype.send = function (body) {
         try {
-            inspectConversationPrepareRequest(
+            const preparedBody = prepareConversationPayload(
                 this.__tempHistoryUrl,
                 this.__tempHistoryMethod,
-                body,
-                'prepare XHR request'
+                body
             );
+
+            inspectConversationRequest(
+                this.__tempHistoryUrl,
+                this.__tempHistoryMethod,
+                preparedBody,
+                'conversation XHR request'
+            );
+
+            return originalSend.call(this, preparedBody);
         } catch (_) {}
 
         return originalSend.call(this, body);

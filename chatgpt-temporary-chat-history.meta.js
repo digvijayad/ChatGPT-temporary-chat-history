@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Temporary Chat History
 // @namespace    https://github.com/digvijayad/ChatGPT-temporary-chat-history
-// @version      2.3.2
+// @version      2.3.3
 // @description  Saves ChatGPT Temporary Chat IDs/URLs locally so closed temporary chats can be recovered.
 // @author       Digvijay
 // @license      MIT
