@@ -46,7 +46,7 @@ The clock button stays beside ChatGPT's native header controls. Its badge shows 
 - Adds a compact history button beside ChatGPT's current header controls.
 - Repositions automatically as the ChatGPT header changes.
 - Searches saved titles, conversation IDs, and URLs.
-- Opens saved conversations and copies their URL or ID.
+- Opens and renames saved conversations, and copies their URL or ID.
 - Restores the Temporary Chat request flag when continuing a locally saved Temporary Chat.
 - Deletes individual entries and imports or exports history as JSON.
 - Sends no saved history to an external service.
@@ -56,7 +56,7 @@ The clock button stays beside ChatGPT's native header controls. Its badge shows 
 1. Start a Temporary Chat on ChatGPT and send a message.
 2. The script detects the conversation and saves its ID, URL, and first-prompt title locally.
 3. Select the clock button in the ChatGPT header to open Temporary Chat History.
-4. Search the list or use **Open**, **Copy URL**, **Copy ID**, and **Delete** for an entry.
+4. Search the list or use **Open**, **Rename**, **Copy URL**, **Copy ID**, and **Delete** for an entry.
 5. Use **Export** to create a backup and **Import** to restore one.
 
 ## Installation

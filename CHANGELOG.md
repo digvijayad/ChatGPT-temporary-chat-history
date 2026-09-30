@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic versioning where practical.
 
+## [2.4.0] - 2026-09-30
+
+### Added
+
+- Adds a Rename action for locally saved Temporary Chats.
+- Preserves custom titles instead of replacing them during automatic title detection.
+
+## [2.3.4] - 2026-09-30
+
+### Fixed
+
+- Uses the first user message in the intercepted conversation request as the title instead of relying only on delayed DOM detection.
+- Prevents later follow-up messages from replacing an existing Temporary Chat title.
+
 ## [2.3.3] - 2026-09-30
 
 ### Fixed

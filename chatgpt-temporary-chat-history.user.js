@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Temporary Chat History
 // @namespace    https://github.com/digvijayad/ChatGPT-temporary-chat-history
-// @version      2.3.3
+// @version      2.4.0
 // @description  Saves ChatGPT Temporary Chat IDs/URLs locally so closed temporary chats can be recovered.
 // @author       Digvijay
 // @license      MIT
@@ -248,7 +248,12 @@
         }
 
         if (isConversationId(parsed.conversation_id)) {
-            captureConversation(parsed.conversation_id, source, true);
+            captureConversation(
+                parsed.conversation_id,
+                source,
+                true,
+                getFirstPromptFromPayload(parsed)
+            );
         }
     }
 
@@ -264,6 +269,35 @@
     // FIRST PROMPT / TITLE DETECTION
     // ============================================================
 
+    function normalizePromptTitle(value) {
+        if (typeof value !== 'string') {
+            return null;
+        }
+
+        const text = value.trim().replace(/\s+/g, ' ');
+
+        if (!text) {
+            return null;
+        }
+
+        return text.length > 180 ? text.substring(0, 180) + '…' : text;
+    }
+
+    function getFirstPromptFromPayload(payload) {
+        if (!Array.isArray(payload?.messages)) {
+            return null;
+        }
+
+        const message = payload.messages.find(item => item?.author?.role === 'user');
+        const parts = message?.content?.parts;
+
+        if (!Array.isArray(parts)) {
+            return null;
+        }
+
+        return normalizePromptTitle(parts.filter(part => typeof part === 'string').join(' '));
+    }
+
     function detectFirstPrompt() {
         try {
             if (!currentConversationId) {
@@ -276,13 +310,11 @@
                 return null;
             }
 
-            const text = nodes[0].innerText?.trim().replace(/\s+/g, ' ');
+            const newPrompt = normalizePromptTitle(nodes[0].innerText);
 
-            if (!text) {
+            if (!newPrompt) {
                 return null;
             }
-
-            const newPrompt = text.length > 180 ? text.substring(0, 180) + '…' : text;
 
             if (newPrompt !== firstPrompt) {
                 firstPrompt = newPrompt;
@@ -315,7 +347,7 @@
     // SAVE / UPDATE CONVERSATION
     // ============================================================
 
-    function captureConversation(id, source, temporaryEvidence = false) {
+    function captureConversation(id, source, temporaryEvidence = false, requestPrompt = null) {
         if (!isConversationId(id)) {
             return;
         }
@@ -371,14 +403,25 @@
             // IMPORTANT:
             // Only assign title if we have
             // positively detected a new prompt.
-            if (firstPrompt) {
-                existing.title = firstPrompt;
+            if (!existing.customTitle) {
+                if (firstPrompt) {
+                    existing.title = firstPrompt;
+                } else if (
+                    (!existing.title || existing.title === 'Temporary Chat') &&
+                    requestPrompt
+                ) {
+                    existing.title = requestPrompt;
+                }
             }
         } else {
+            if (requestPrompt) {
+                firstPrompt = requestPrompt;
+            }
+
             history.unshift({
                 id,
 
-                title: firstPrompt || 'Temporary Chat',
+                title: requestPrompt || firstPrompt || 'Temporary Chat',
 
                 url: canonicalUrl,
 
@@ -420,6 +463,10 @@
         const entry = history.find(item => item.id === currentConversationId);
 
         if (!entry) {
+            return;
+        }
+
+        if (entry.customTitle) {
             return;
         }
 
@@ -1146,6 +1193,8 @@
 
                                         ${smallButton('Open', 'open')}
 
+                                        ${smallButton('Rename', 'rename')}
+
                                         ${smallButton('Copy URL', 'copy-url')}
 
                                         ${smallButton('Copy ID', 'copy-id')}
@@ -1220,6 +1269,31 @@
             case 'copy-id':
                 copyText(item.id);
                 break;
+
+            case 'rename': {
+                const value = window.prompt(
+                    'Rename this temporary chat:',
+                    item.title || 'Temporary Chat'
+                );
+
+                if (value === null) {
+                    break;
+                }
+
+                const title = normalizePromptTitle(value);
+
+                if (!title) {
+                    alert('The title cannot be empty.');
+                    break;
+                }
+
+                item.title = title;
+                item.customTitle = true;
+
+                saveHistory(history);
+                renderHistory();
+                break;
+            }
 
             case 'delete':
                 if (confirm('Delete this temporary chat from local history?')) {
